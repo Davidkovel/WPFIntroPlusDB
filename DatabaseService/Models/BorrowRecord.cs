@@ -1,6 +1,8 @@
+using DatabaseService.Abstractions;
+
 namespace DatabaseService.Models;
 
-public class BorrowRecordModel
+public class BorrowRecord : IModel
 {
     public int Id { get; set; }
     public int BookId { get; set; }
@@ -8,8 +10,18 @@ public class BorrowRecordModel
     public DateTime BorrowDate { get; set; }
     public DateTime? ReturnDate { get; set; }
     public bool IsReturned { get; set; }
+    
+    public PeopleModel student { get; set; }
+    public Dictionary<PeopleModel, List<BookModel>> marks { get; set; }
+    
+    public BorrowRecord()
+    {
+        student = new PeopleModel();
+        marks = new Dictionary<PeopleModel, List<BookModel>>();
+        
+    }
 
-    public BorrowRecordModel(int id, int bookId, int userId, DateTime borrowDate, DateTime? returnDate, bool isReturned)
+    public BorrowRecord(int id, int bookId, int userId, DateTime borrowDate, DateTime? returnDate, bool isReturned)
     {
         Id = id;
         BookId = bookId;

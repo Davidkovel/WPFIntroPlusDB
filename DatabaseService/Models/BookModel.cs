@@ -1,6 +1,8 @@
+using DatabaseService.Abstractions;
+
 namespace DatabaseService.Models;
 
-public class BookModel
+public class BookModel : IModel
 {
     public int Id { get; set; }
     public string Title { get; set; }
