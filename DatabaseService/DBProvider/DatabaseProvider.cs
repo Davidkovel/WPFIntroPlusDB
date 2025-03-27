@@ -14,21 +14,23 @@ public class DatabaseProvider
         _connectionString = connectionString;
     }
     
-    public async Task<int> InsertMarkAndSubjectByUserLogin(string login, string subject, int mark)
+    public async Task<int> InsertBorrowRecordsByUserLogin(string login, string bookTitle, string bookAuthor)
     {
         await using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync("USE Library");
-        return await connection.ExecuteAsync(DbCommands.InsertMarkAndSubjectByUserLogin(login, subject, mark));
+        int result = await connection.ExecuteAsync(DbCommands.InsertBorrowRecordCommand(login, bookTitle, bookAuthor));
+        Console.WriteLine($"Inserted {result} records");
+        return result;
     }
 
-    public async Task<BorrowRecord?> GetSubjectAndMarksByUserLogin(string login)
+    public async Task<IEnumerable<dynamic>> GetSubjectAndMarksByUserLogin(string login)
     {
         await using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync("USE Library");
         //!TODO Fix: Add a query to get all subjects and marks by user login
-        var result = await connection.QueryAsync(DbCommands.GetSubjectAndMarksByUserLogin(login));
+        var result = await connection.QueryAsync(DbCommands.GetBorrowRecordsByUserLogin(login));
         var enumerable = result.ToList();
-        if(enumerable.ToList().Count > 0)
+        if(enumerable.ToList().Count == 0)
         {
             return null;
         }
@@ -37,7 +39,7 @@ public class DatabaseProvider
         {
             borrowRecord.marks.Add(row.Subject, row.Mark);
         }
-        return borrowRecord;
+        return enumerable;
     }
         
     [Obsolete("Obsolete")]

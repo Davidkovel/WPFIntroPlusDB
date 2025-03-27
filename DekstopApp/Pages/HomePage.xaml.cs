@@ -12,7 +12,7 @@ public partial class HomePage : UserControl
     UserModel _user;
     private DatabaseProvider? _databaseProvider;
     private BorrowRecord? _peopleBorrowRecords;
-    private BorrowRecordsRepository<BorrowRecord?>? _borrowRecordsRepository;
+    private BorrowRecordsRepository<IEnumerable<dynamic>?> _borrowRecordsRepository;
 
     public HomePage(UserModel user, DatabaseProvider? databaseProvider)
     {
@@ -22,34 +22,58 @@ public partial class HomePage : UserControl
         InitializeComponent();
     }
 
-    private void OnAddClick(object sender, RoutedEventArgs e)
+    private async void OnAddClick(object sender, RoutedEventArgs e)
     {
-        ;
+        try
+        {
+            string bookTitle = tBookTitle.Text;
+            string bookAuthor = TBookAuthor.Text;
+        
+            if (string.IsNullOrWhiteSpace(bookTitle) || string.IsNullOrWhiteSpace(bookAuthor))
+            {
+                MessageBox.Show("Please enter both book title and author", "Validation Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            bool success = await _borrowRecordsRepository.AddBorrowRecordsByUserLogin(
+                _user.Login, bookTitle, bookAuthor);
+        
+            if (success)
+            {
+                MessageBox.Show("Book borrowed successfully!", "Success", 
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                await RefreshDataGrid();
+            }
+            else
+            {
+                MessageBox.Show("Failed to borrow book. Please check if the book exists.", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "System Exception", 
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
-    void FillDataGrid(BorrowRecord studentSubjectMarks)
+    private async Task RefreshDataGrid()
     {
-        foreach (var subject in studentSubjectMarks.marks)
-        {
-            var dataGridCells = new List<DataGridCell>();
-            var dataGridCell = new DataGridCell();
-            dataGridCell.Content = subject.Key;
-            dataGridCells.Add(dataGridCell);
-            dataGridCell = new DataGridCell();
-            dataGridCell.Content = subject.Value;
-            dataGridCells.Add(dataGridCell);
-            dgMarkAndSubject.Items.Add(dataGridCells);
-        }
-
-        dgMarkAndSubject.Items.Refresh();
+        var items = await _borrowRecordsRepository.GetBorrowRecordsByUserLogin(_user.Login);
+        dgMarkAndSubject.ItemsSource = items;
+        dgMarkAndSubject.UpdateLayout();
     }
 
     private async void HomePage_OnLoaded(object sender, RoutedEventArgs e)
     {
-        _peopleBorrowRecords = await _borrowRecordsRepository?.GetBorrowRecordsByUserLogin(_user.Login);
-        if (_peopleBorrowRecords != null)
+        try
         {
-            FillDataGrid(_peopleBorrowRecords);
+            await RefreshDataGrid();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "System Exception", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

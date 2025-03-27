@@ -4,7 +4,7 @@ using DatabaseService.Models;
 
 namespace DatabaseService.Repository;
 
-public class BorrowRecordsRepositoryImpl : BorrowRecordsRepository<BorrowRecord?>
+public class BorrowRecordsRepositoryImpl : BorrowRecordsRepository<IEnumerable<dynamic>?>
 {
     private readonly DatabaseProvider _databaseProvider;
 
@@ -13,15 +13,23 @@ public class BorrowRecordsRepositoryImpl : BorrowRecordsRepository<BorrowRecord?
         _databaseProvider = databaseProvider;
     }
 
-    public override async Task<BorrowRecord?> GetBorrowRecordsByUserLogin(string login)
+    public override async Task<IEnumerable<dynamic>?> GetBorrowRecordsByUserLogin(string login)
     {
         var result = await _databaseProvider.GetSubjectAndMarksByUserLogin(login);
         return result;
     }
 
-    public override async Task<bool> AddBorrowRecordsByUserLogin(string login, string subject, int mark)
+    public override async Task<bool> AddBorrowRecordsByUserLogin(string login, string bookTitle, string bookAuthor)
     {
-        var result = await _databaseProvider.InsertMarkAndSubjectByUserLogin(login, subject, mark);
-        return result > 0;
+        try
+        {
+            int result = await _databaseProvider.InsertBorrowRecordsByUserLogin(login, bookTitle, bookAuthor);
+            return result > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while adding borrow record: {ex.Message}");
+            return false;
+        }
     }
 }

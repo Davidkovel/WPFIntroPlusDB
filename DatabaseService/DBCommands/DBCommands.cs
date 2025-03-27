@@ -52,7 +52,25 @@ public class DbCommands
                 );
             END
 
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Subjects')
+            BEGIN
+                CREATE TABLE Subjects (
+                    Id INT PRIMARY KEY IDENTITY(1,1),
+                    Name NVARCHAR(100) NOT NULL UNIQUE
+                );
+            END
 
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Grades')
+            BEGIN
+                CREATE TABLE Grades (
+                    Id INT PRIMARY KEY IDENTITY(1,1),
+                    UserId INT NOT NULL,
+                    SubjectId INT NOT NULL,
+                    Mark INT NOT NULL,
+                    CONSTRAINT FK_Grades_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+                    CONSTRAINT FK_Grades_Subjects FOREIGN KEY (SubjectId) REFERENCES Subjects(Id) ON DELETE CASCADE
+                );
+            END
         ";
 
     public static string DropTablesCommand() => @"
@@ -72,48 +90,81 @@ public class DbCommands
         return "USE Library; SELECT * FROM Users WHERE login = @login;";
     }
 
-    public static string InsertMarkAndSubjectByUserLogin(string login, string subject, int mark)
-    {
-        return $@"USE Library; 
-                                    DECLARE @userId INT;
-                                    SELECT @userId = Id FROM Users WHERE Login = {login};
-                                    DECLARE @studentId INT;
-                                    SELECT @studentId = Id FROM Students WHERE UserId = @userId;
-                                    DECLARE @markId INT;
-                                    SELECT @markId = Id FROM Marks WHERE StudentId = @studentId;
-                                    DECLARE @subjectId INT;
-                                    SELECT @subjectId = Id FROM Subjects WHERE Name = {subject};
-                                    INSERT INTO MarksDetail (MarkId, Mark) VALUES (@markId, {mark});
-                                    INSERT INTO StudentSubjects (StudentId, SubjectId) VALUES (@studentId, @subjectId);";
-    }
-
-    public static string GetSubjectAndMarksByUserLogin(string login)
+    public static string InsertBorrowRecordCommand(string login, string bookTitle, string bookAuthor)
     {
         return $@"
         USE Library;
+        
         DECLARE @userId INT;
         SELECT @userId = Id FROM Users WHERE Login = '{login}';
-        DECLARE @studentId INT;
-        SELECT @studentId = Id FROM Students WHERE UserId = @userId;
-        WITH SubjectMarks AS (
+        
+        DECLARE @bookId INT;
+        SELECT @bookId = Id FROM Books WHERE Title = '{bookTitle}' AND Author = '{bookAuthor}' AND IsAvailable = 1;
+        
+        IF @userId IS NOT NULL AND @bookId IS NOT NULL
+        BEGIN
+            BEGIN TRANSACTION;
+            
+            INSERT INTO BorrowRecords (BookId, UserId, BorrowDate) 
+            VALUES (@bookId, @userId, GETDATE());
+            
+            UPDATE Books SET IsAvailable = 0 WHERE Id = @bookId;
+            
+            COMMIT TRANSACTION;
+            SELECT 1; -- Успех
+        END
+        ELSE
+        BEGIN
+            SELECT 0; -- Неудача (пользователь не найден или книга недоступна)
+        END";
+    }
+
+    public static string ReturnBookCommand(int recordId)
+    {
+        return $@"
+            USE Library;
+            UPDATE BorrowRecords 
+            SET ReturnDate = GETDATE(), IsReturned = 1 
+            WHERE Id = {recordId};
+            
+            UPDATE Books b
+            SET b.IsAvailable = 1
+            FROM Books b
+            JOIN BorrowRecords br ON b.Id = br.BookId
+            WHERE br.Id = {recordId};";
+    }
+
+    public static string GetBorrowRecordsByUserLogin(string login)
+    {
+        return $@"
+            USE Library;
             SELECT 
-                s.Id AS SubjectId, 
-                s.Name AS SubjectName, 
-                md.Mark
+                br.Id AS RecordId,
+                b.Id AS BookId,
+                b.Title AS BookTitle,
+                b.Author AS BookAuthor,
+                u.Id AS UserId,
+                br.BorrowDate,
+                br.ReturnDate,
+                br.IsReturned
             FROM 
-                Subjects s
-            INNER JOIN 
-                StudentSubjects ss ON s.Id = ss.SubjectId
-            INNER JOIN 
-                MarksDetail md ON md.MarkId = ss.SubjectId
+                BorrowRecords br
+            JOIN 
+                Books b ON br.BookId = b.Id
+            JOIN 
+                Users u ON br.UserId = u.Id
             WHERE 
-                ss.StudentId = @studentId
-        )
-        SELECT 
-            SubjectId, 
-            SubjectName, 
-            Mark
-        FROM 
-            SubjectMarks;";
+                u.Login = '{login}'
+            ORDER BY 
+                br.BorrowDate DESC;";
+    }
+
+    public static string GetAvailableBooksCommand()
+    {
+        return @"
+            USE Library;
+            SELECT * FROM Books 
+            WHERE IsAvailable = 1
+            ORDER BY Title;";
     }
 }
